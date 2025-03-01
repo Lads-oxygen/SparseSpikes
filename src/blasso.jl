@@ -14,8 +14,8 @@ BLASSO struct to hold the problem data and solutions.
 - `μ`: Recovered measure.
 - `p`: Dual solution.
 """
-mutable struct BLASSO{T<:Number}
-    y::Vector{T}                                             # Observation vector/matrix
+mutable struct BLASSO
+    y::Vector{<:Number}                                             # Observation vector/matrix
     operators::Operators                                     # Operators structure
     domain::Union{Vector,Vector{Vector}}                     # Domain of the problem
     λ::Union{<:Real,Nothing}                                 # Regularisation parameter (nullable)
@@ -32,7 +32,7 @@ mutable struct BLASSO{T<:Number}
         p::Union{Vector{<:Number},Nothing}=nothing
     )
         dim = isa(domain, Vector{<:Real}) ? 1 : 2
-        new{eltype(y)}(vec(y), operators, domain, λ, μ, p, dim)
+        new(vec(y), operators, domain, λ, μ, p, dim)
     end
 end
 
@@ -56,7 +56,7 @@ function solve!(prob::BLASSO,
     δ::Union{<:Real,Nothing}=nothing,
     τ::Union{<:Real,Nothing}=nothing,
     λ0::Real=1e3,
-    q::Real=0.5,
+    q::Real=0.9,
     options::Dict{Symbol,<:Any}=Dict{Symbol,Any}())
 
     if q <= 0 || q >= 1
@@ -77,6 +77,9 @@ function solve!(prob::BLASSO,
             @time solve!(prob, solver, options=options)
             r = norm(prob.operators.Φ(prob.μ...) - prob.y)
             prob.λ *= q
+            if prob.λ < δ
+                throw(ArgumentError("Regularisation parameter λ has become too small."))
+            end
             println("r: ", r)
             println("τδ: ", τ * δ)
             println("prob.μ: ", prob.μ)

@@ -42,12 +42,14 @@ Plot the spikes of a discrete measure.
 - `color`: Color of the spikes.
 - `label`: Label for the spikes.
 - `marker`: Marker style for the spikes.
+- `markersize`: Size of the markers.
+- `markerstrokewidth`: Width of the marker stroke.
 """
-function plot_spikes!(plt::Plots.Plot, μ::DiscreteMeasure; color::Symbol=:red, colorscheme=:viridis, label::Union{String,LaTeXString}="", marker::Symbol=:circle)
+function plot_spikes!(plt::Plots.Plot, μ::DiscreteMeasure; color::Symbol=:red, colorscheme=:viridis, label::Union{String,LaTeXString}="", marker::Symbol=:circle, markersize::Real=0.5, markerstrokewidth::Real=0.1)
     if μ.dims == 1
-        plot!(plt, μ.x, μ.a, seriestype=:scatter, color=color, label=label, marker=marker)
+        plot!(plt, μ.x, μ.a, seriestype=:scatter, color=color, label=label, marker=marker, markersize=markersize, markerstrokewidth=markerstrokewidth)
     elseif μ.dims == 2
-        scatter!(plt, μ.x[1], μ.x[2], zcolor=μ.a, color=colorscheme, label=label, marker=marker, colorbar=true)
+        scatter!(plt, μ.x[1], μ.x[2], zcolor=μ.a, color=colorscheme, label=label, marker=marker, colorbar=true, markersize=markersize, markerstrokewidth=markerstrokewidth)
     end
 end
 
@@ -98,7 +100,7 @@ function pre_certificate(μ0::DiscreteMeasure, ops::Operators)::Union{Vector,Mat
     else
         error("Not implemented")
     end
-    pV = pinv(Γx) * b
+    pV = Γx \ b
     ηV = ops.adjΦ(pV)
     return ηV
 end
