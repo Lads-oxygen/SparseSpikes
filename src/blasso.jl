@@ -1,4 +1,5 @@
 using ..SparseSpikes
+using Optim
 
 export BLASSO, solve!
 
@@ -13,9 +14,10 @@ BLASSO struct to hold the problem data and solutions.
 - `λ`: Regularisation parameter.
 - `μ`: Recovered measure.
 - `p`: Dual solution.
+- `dim`: Spatial dimension of the problem.
 """
 mutable struct BLASSO
-    y::Vector{<:Number}                                             # Observation vector/matrix
+    y::AbstractVector{<:Number}                              # Observation vector/matrix
     operators::Operators                                     # Operators structure
     domain::Union{Vector,Vector{Vector}}                     # Domain of the problem
     λ::Union{<:Real,Nothing}                                 # Regularisation parameter (nullable)
@@ -28,11 +30,9 @@ mutable struct BLASSO
         operators::Operators,
         domain::Vector,
         λ::Union{<:Real,Nothing}=nothing,
-        μ::Union{DiscreteMeasure,Nothing}=nothing,
-        p::Union{Vector{<:Number},Nothing}=nothing
     )
         dim = isa(domain, Vector{<:Real}) ? 1 : 2
-        new(vec(y), operators, domain, λ, μ, p, dim)
+        new(vec(y), operators, domain, λ, nothing, nothing, dim)
     end
 end
 
@@ -77,7 +77,7 @@ function solve!(prob::BLASSO,
             @time solve!(prob, solver, options=options)
             r = norm(prob.operators.Φ(prob.μ...) - prob.y)
             prob.λ *= q
-            if prob.λ < δ
+            if prob.λ < 1e-3δ
                 throw(ArgumentError("Regularisation parameter λ has become too small."))
             end
             println("r: ", r)
@@ -88,10 +88,12 @@ function solve!(prob::BLASSO,
     else
         if solver == :SFW
             return SFW!(prob, options)
+        elseif solver == :BSFW
+            return BSFW!(prob, options)
         elseif solver == :SDP
             return SDP!(prob)
         else
-            throw(ArgumentError("Solver must be either :SDP or :SFW"))
+            throw(ArgumentError("Solver must be either :SDP, :SFW or :BSFW."))
         end
     end
     return prob

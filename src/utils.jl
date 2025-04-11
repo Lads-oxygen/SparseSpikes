@@ -1,18 +1,18 @@
-using ForwardDiff
+using ForwardDiff, LaTeXStrings
 
 export DiscreteMeasure, plot_spikes!, pre_certificate, plot_roots!, complex_grad
 
 struct DiscreteMeasure
-    x::Union{Vector{Float64},Vector{Vector{Float64}}}
+    x::Union{Vector{Float64},Vector{<:Vector{<:AbstractFloat}}}
     a::Vector{Float64}
     dims::Int
     n_spikes::Int
 
-    function DiscreteMeasure(x::Vector{Float64}, a::Vector{Float64})
+    function DiscreteMeasure(x::Vector{<:AbstractFloat}, a::Vector{<:AbstractFloat})
         new(x, a, 1, length(x))
     end
 
-    function DiscreteMeasure(x::Vector{Vector{Float64}}, a::Vector{Float64})
+    function DiscreteMeasure(x::Vector{<:Vector{<:AbstractFloat}}, a::Vector{<:AbstractFloat})
         new(x, a, length(x), length(x[1]))
     end
 end
@@ -45,7 +45,7 @@ Plot the spikes of a discrete measure.
 - `markersize`: Size of the markers.
 - `markerstrokewidth`: Width of the marker stroke.
 """
-function plot_spikes!(plt::Plots.Plot, μ::DiscreteMeasure; color::Symbol=:red, colorscheme=:viridis, label::Union{String,LaTeXString}="", marker::Symbol=:circle, markersize::Real=0.5, markerstrokewidth::Real=0.1)
+function plot_spikes!(plt::Plots.Plot, μ::DiscreteMeasure; color::Symbol=:red, colorscheme=:viridis, label::Union{String,LaTeXString}="", marker::Symbol=:circle, markersize::Real=5, markerstrokewidth::Real=1)
     if μ.dims == 1
         plot!(plt, μ.x, μ.a, seriestype=:scatter, color=color, label=label, marker=marker, markersize=markersize, markerstrokewidth=markerstrokewidth)
     elseif μ.dims == 2

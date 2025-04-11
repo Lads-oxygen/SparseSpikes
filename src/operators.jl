@@ -112,20 +112,31 @@ end
 Forward operator using a discretised Gaussian kernel with standard deviation `σ` on grid `plt_grid_x1` and `plt_grid_x2`.
 """
 function gaussian_operators_2D(σ::Real, plt_grid_x1::AbstractMatrix{<:Real}, plt_grid_x2::AbstractMatrix{<:Real})::Operators
-    dσ2 = 1 / σ^2
+    σ2 = 1 / (2 * σ^2)
     grid_length = length(plt_grid_x1)
     grid_points = hcat(vec(plt_grid_x1), vec(plt_grid_x2))
 
-    function gauss2D(μ::AbstractVector{T}) where {T<:Real}
-        distances = sum(abs2, grid_points .- permutedims(μ), dims=2)
-        output = @. exp(-distances * dσ2)
-        output ./= maximum(output)  # Normalize in-place
+    function gauss2D(μ::AbstractVector{T}, output::AbstractVector{<:Real}) where {T<:Real}
+        @fastmath @inbounds begin
+            distances = sum(abs2, grid_points .- permutedims(μ), dims=2)
+            @. output = exp(-distances * σ2)
+            output ./= maximum(output)
+            # output ./= sum(output)
+        end
         return output
+    end
+
+    function gauss2D(μ::AbstractVector{T}) where {T<:Real}
+        # Use the same type as the computation result to ensure compatibility with ForwardDiff
+        S = typeof(exp(-zero(T) * σ2))
+        output = Vector{S}(undef, size(grid_points, 1))
+        return gauss2D(μ, output)
     end
 
     function ϕ(x1::AbstractVector{T1}, x2::AbstractVector{T2}) where {T1<:Real,T2<:Real}
         n_points = length(x1)
-        T = promote_type(T1, T2, Float64)
+        # T = promote_type(T1, T2, Float32)
+        T = promote_type(eltype(T1), eltype(T2), Float32)
         result = Matrix{T}(undef, grid_length, n_points)
         for i in 1:n_points
             view(result, :, i) .= gauss2D([x1[i], x2[i]])
@@ -133,8 +144,37 @@ function gaussian_operators_2D(σ::Real, plt_grid_x1::AbstractMatrix{<:Real}, pl
         return result
     end
 
+    # Modified Φ that avoids allocating the full matrix
     function Φ(x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, a::AbstractVecOrMat{<:Real})
-        return ϕ(x1, x2) * a
+        n_points = length(x1)
+
+        # Use a more flexible type that can handle dual numbers
+        T = promote_type(eltype(x1), eltype(x2), eltype(a), Float32)
+        result = zeros(T, grid_length)
+
+        if n_points < 100
+            return ϕ(x1, x2) * a
+        end
+
+        # Multithreaded implementation for large point sets to avoid creating large matrix when calling kernel ϕ
+        buffers = [similar(result) for _ in 1:Threads.nthreads()]
+        results = [zeros(T, grid_length) for _ in 1:Threads.nthreads()]
+
+        Threads.@threads for i in 1:n_points
+            tid = Threads.threadid()
+            local_μ = zeros(T, 2)
+            local_μ[1] = x1[i]
+            local_μ[2] = x2[i]
+            gauss2D(local_μ, buffers[tid])
+            axpy!(a[i], buffers[tid], results[tid])
+        end
+
+        # Combine results from all threads
+        for tid in 1:Threads.nthreads()
+            axpy!(1.0, results[tid], result)
+        end
+
+        return result
     end
 
     function adjΦ(k::AbstractArray{<:Real}; grid_x1::AbstractArray{<:Real}=plt_grid_x1, grid_x2::AbstractArray{<:Real}=plt_grid_x2)
