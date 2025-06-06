@@ -115,13 +115,14 @@ function gaussian_operators_2D(σ::Real, plt_grid_x1::AbstractMatrix{<:Real}, pl
     σ2 = 1 / (2 * σ^2)
     grid_length = length(plt_grid_x1)
     grid_points = hcat(vec(plt_grid_x1), vec(plt_grid_x2))
+    Δx = plt_grid_x1[1, 2] - plt_grid_x1[1, 1]
+    Δy = plt_grid_x2[2, 1] - plt_grid_x2[1, 1]
+    norm_cst = Δx * Δy / (2π * σ^2)
 
     function gauss2D(μ::AbstractVector{T}, output::AbstractVector{<:Real}) where {T<:Real}
         @fastmath @inbounds begin
             distances = sum(abs2, grid_points .- permutedims(μ), dims=2)
-            @. output = exp(-distances * σ2)
-            output ./= maximum(output)
-            # output ./= sum(output)
+            @. output = norm_cst * exp(-distances * σ2)
         end
         return output
     end
@@ -135,7 +136,6 @@ function gaussian_operators_2D(σ::Real, plt_grid_x1::AbstractMatrix{<:Real}, pl
 
     function ϕ(x1::AbstractVector{T1}, x2::AbstractVector{T2}) where {T1<:Real,T2<:Real}
         n_points = length(x1)
-        # T = promote_type(T1, T2, Float32)
         T = promote_type(eltype(T1), eltype(T2), Float32)
         result = Matrix{T}(undef, grid_length, n_points)
         for i in 1:n_points

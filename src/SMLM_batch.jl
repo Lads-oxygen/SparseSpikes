@@ -1,4 +1,5 @@
 using Revise, Plots, LinearAlgebra, LaTeXStrings, Images, Printf
+using Base.Threads, ProgressMeter
 include("../src/SparseSpikes.jl")
 using .SparseSpikes
 
@@ -32,7 +33,7 @@ function readImage(imageDir, frameNum, n_pixels_x)
     return channelview(img)
 end
 
-# Process frame
+# Process a single frame
 function runSFW(image, ops, λ, domain, options=Dict())
     y = vec(image)
     prob = BLASSO(y, ops, domain, λ)
@@ -65,26 +66,33 @@ function writeToCSV(filename, μ, frame)
     end
 end
 
-using Base.Threads, ProgressMeter
+# Find a unique filename by appending a number if needed
+function get_unique_filename(basepath)
+    path, ext = splitext(basepath)
+    i = 1
+    filename = basepath
+    while isfile(filename)
+        filename = "$(path)_$(i)$(ext)"
+        i += 1
+    end
+    return filename
+end
 
 λ = 0.0025
 nImages = 361
 
 results = Vector{Any}(undef, nImages)
+input_file = "SMLM/high_density_data/sequence"
+output_file = get_unique_filename("SMLM/results/high_density_results.csv")
 
-# @time @showprogress desc = "Frame: " for frameNum in 1:nImages
 @time @showprogress desc = "Frame: " Threads.@threads for frameNum in 1:nImages
-    image = readImage("high_density/sequence", frameNum, 64)
+    image = readImage(input_file, frameNum, 64)
     results[frameNum] = runSFW(image, ops, λ, domain, Dict(:descent => :BFGS))
 end
 
 for frameNum in 1:nImages
-    writeToCSV("results/SMLM_high_density_results_2.csv", results[frameNum], frameNum)
+    writeToCSV(output_file, results[frameNum], frameNum)
 end
-
-
-# try reducing grid size and ascent tol
-
 
 # 5115.790710 seconds sparse sfw
 

@@ -1,13 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="400" viewBox="0 0 1600 1600">
 <defs>
-  <clipPath id="clip130">
+  <clipPath id="clip980">
     <rect x="0" y="0" width="1600" height="1600"/>
   </clipPath>
 </defs>
-<polyline clip-path="url(#clip130)" style="stroke:#000000; stroke-linecap:round; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="0,1600 1600,1600 "/>
-<polyline clip-path="url(#clip130)" style="stroke:#000000; stroke-linecap:round; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="0,1600 0,0 "/>
-<g clip-path="url(#clip130)">
+<path clip-path="url(#clip980)" d="M0 1600 L1600 1600 L1600 0 L0 0  Z" fill="#ffffff" fill-rule="evenodd" fill-opacity="1"/>
+<defs>
+  <clipPath id="clip981">
+    <rect x="320" y="160" width="1121" height="1121"/>
+  </clipPath>
+</defs>
+<path clip-path="url(#clip980)" d="M0 1600 L1600 1600 L1600 0 L0 0  Z" fill="#ffffff" fill-rule="evenodd" fill-opacity="1"/>
+<polyline clip-path="url(#clip980)" style="stroke:#000000; stroke-linecap:round; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="0,1600 1600,1600 "/>
+<polyline clip-path="url(#clip980)" style="stroke:#000000; stroke-linecap:round; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="0,1600 0,0 "/>
+<g clip-path="url(#clip980)">
 <image width="1616" height="1616" xlink:href="data:image/png;base64,
 iVBORw0KGgoAAAANSUhEUgAABlAAAAZQCAYAAAAFdA3UAAAgAElEQVR4nOzbMW7bQBBAUdHRRXLf
 FDmxmS7FbwJ7DE8Weq8XdrhcUjC+df38/et+AAAAAAAA8Nfb9gAAAAAAAAD/GwEFAAAAAAAgBBQA
@@ -313,8 +320,6 @@ AACMQAEAAAAAABiBAgAAAAAAMAIFAAAAAABgBAoAAAAAAMAIFAAAAAAAgBEoAAAAAAAAI1AAAAAA
 AABGoAAAAAAAAExk4qEVAZtOqAAAAABJRU5ErkJggg==
 " transform="translate(-7, -7)"/>
 </g>
-<circle clip-path="url(#clip130)" cx="745.505" cy="800" r="18" fill="#f10000" fill-rule="evenodd" fill-opacity="1" stroke="none"/>
-<circle clip-path="url(#clip130)" cx="854.495" cy="800" r="18" fill="#0d0000" fill-rule="evenodd" fill-opacity="1" stroke="none"/>
-<polyline clip-path="url(#clip130)" style="stroke:#000000; stroke-linecap:round; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="0,1600 1600,1600 "/>
-<polyline clip-path="url(#clip130)" style="stroke:#000000; stroke-linecap:round; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="0,1600 0,0 "/>
+<circle clip-path="url(#clip980)" cx="851.014" cy="800" r="18" fill="#060000" fill-rule="evenodd" fill-opacity="1" stroke="none"/>
+<circle clip-path="url(#clip980)" cx="749.021" cy="800" r="18" fill="#f80000" fill-rule="evenodd" fill-opacity="1" stroke="none"/>
 </svg>

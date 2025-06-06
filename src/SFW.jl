@@ -18,7 +18,6 @@ function clamp_strict!(x::AbstractArray, lo::AbstractArray, hi::AbstractArray)
     @inbounds for i in eachindex(x, lo, hi)
         x[i] = clamp_strict(x[i], lo[i], hi[i])
     end
-    # return x
 end
 
 function prune!(xvals::AbstractVector{T}, avals::AbstractVector{T}, factor::Real=1e-5) where {T<:Real}
@@ -75,7 +74,7 @@ function η(
     adjΦ(y - Φ(x..., a), grid_x1=grid[1], grid_x2=grid[2]) / λ
 end
 
-# make it local ascent as well
+# #TODO: make it local ascent as well
 function compute_next_spike(
     xgrid::AbstractVector{T},
     xvals::AbstractVector{T},
@@ -471,7 +470,7 @@ function SFW!(blasso::BLASSO, options::Dict{Symbol,<:Any}=Dict{Symbol,Any}())::B
 
         η_max < tol && break
 
-        lt = @timed lasso_update!(xnew, xvals, avals, M, k, adjΦ, Φ, y, λ, blasso.domain, amplitudes_lo)
+        lt = @timed lasso_update!(xnew, xvals, avals, M, k, adjΦ, Φ, y, λ, blasso.domain, amplitudes_lo) #TODO need to check this!!
 
         optimise_amplitudes!(xvals, avals, ϕ, y, λ, amplitudes_lo)
 

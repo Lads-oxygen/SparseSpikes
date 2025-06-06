@@ -83,7 +83,6 @@ function solve!(prob::BLASSO,
             println("r: ", r)
             println("τδ: ", τ * δ)
             println("prob.μ: ", prob.μ)
-            println("")
         end
     else
         if solver == :SFW

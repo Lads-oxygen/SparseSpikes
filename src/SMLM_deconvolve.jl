@@ -59,15 +59,15 @@ function mergeDiscreteMeasures(measures)
     return DiscreteMeasure([x1, x2], a)
 end
 
-# Read the results and create discrete measures
-results = readSourcesCSV("high_density/fluorophores/activation.csv")
+# sources = readSourcesCSV("SMLM/high_density_data/fluorophores/activation.csv") # Ground truth data
+# sources = readSourcesCSV("SMLM/results/low_density_results.csv")               # Low density recovered data
+sources = readSourcesCSV("SMLM/results/high_density_results.csv")              # High density recovered data
 
-# results = readSourcesCSV("results/SMLM_low_density_results.csv")
 
 ops = gaussian_operators_2D(σ, plt_grid_x1, plt_grid_x2)
 
 # Apply the PSF operator to the discrete measure
-μ = mergeDiscreteMeasures(results)
+μ = mergeDiscreteMeasures(sources)
 
 reconstructed_image = reshape(ops.Φ(μ.x..., μ.a), num_points, num_points)
 
@@ -75,6 +75,6 @@ using Plots.Measures
 # Display the result
 heatmap(grid, grid, reconstructed_image, c=:viridis, ratio=:equal, size=plot_size, ticks=false, xlabel="", ylabel="", colorbar=false, margins=-2mm)
 
-savefig("figures/SMLM/SMLM_sources_high.svg")
-
-# worse results near ends where psfs are most likely to overlap
+# savefig("figures/SMLM/SMLM_sources.svg")
+# savefig("figures/SMLM/SMLM_inverse_low.svg")
+savefig("figures/SMLM/SMLM_inverse_high.svg")
