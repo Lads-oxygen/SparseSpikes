@@ -1,6 +1,6 @@
-using ForwardDiff, LaTeXStrings
+using ForwardDiff, LaTeXStrings, Plots
 
-export DiscreteMeasure, plot_spikes!, pre_certificate, plot_roots!, complex_grad
+export DiscreteMeasure, plot_spikes!, plot_roots!, pre_certificate, complex_grad
 
 struct DiscreteMeasure
     x::Union{Vector{Float64},Vector{<:Vector{<:AbstractFloat}}}
@@ -31,6 +31,8 @@ function Base.iterate(μ::DiscreteMeasure, i=1)
     end
 end
 
+red_cmap = cgrad([RGB(1, 0, 0), RGB(0, 0, 0)])
+
 """
     plot_spikes!(plt, measure; color=:red, label="", marker=:circle)
 
@@ -45,11 +47,15 @@ Plot the spikes of a discrete measure.
 - `markersize`: Size of the markers.
 - `markerstrokewidth`: Width of the marker stroke.
 """
-function plot_spikes!(plt::Plots.Plot, μ::DiscreteMeasure; color::Symbol=:red, colorscheme=:viridis, label::Union{String,LaTeXString}="", marker::Symbol=:circle, markersize::Real=5, markerstrokewidth::Real=1)
+function plot_spikes!(plt::Plots.Plot, μ::DiscreteMeasure; color::Symbol=:red, colorscheme=red_cmap, label::Union{String,LaTeXString}="", marker::Symbol=:circle, markersize::Real=5, markerstrokewidth::Real=0)
     if μ.dims == 1
         plot!(plt, μ.x, μ.a, seriestype=:scatter, color=color, label=label, marker=marker, markersize=markersize, markerstrokewidth=markerstrokewidth)
     elseif μ.dims == 2
-        scatter!(plt, μ.x[1], μ.x[2], zcolor=μ.a, color=colorscheme, label=label, marker=marker, colorbar=true, markersize=markersize, markerstrokewidth=markerstrokewidth)
+        max_y = maximum(plt.series_list[1][:z])  # assumes the first series is the heatmap
+        norm_a = μ.a .* max_y
+        scatter!(plt, inset=(bbox(0, 0, 1, 1, :bottom)), bgcolor=:transparent,
+            μ.x[1], μ.x[2], zcolor=norm_a, color=colorscheme, label=label, marker=marker, colorbar=false, markersize=markersize, markerstrokewidth=markerstrokewidth,
+            grid=false, ticks=:none)
     end
 end
 

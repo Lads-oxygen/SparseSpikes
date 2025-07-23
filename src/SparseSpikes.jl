@@ -19,6 +19,8 @@ includet("utils.jl")
 includet("blasso.jl")
 includet("SDP.jl")
 includet("SFW.jl")
+includet("MDP.jl")
+includet("solve.jl")
 
 export solve!
 

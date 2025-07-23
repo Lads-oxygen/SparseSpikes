@@ -115,31 +115,36 @@ function gaussian_operators_2D(σ::Real, plt_grid_x1::AbstractMatrix{<:Real}, pl
     σ2 = 1 / (2 * σ^2)
     grid_length = length(plt_grid_x1)
     grid_points = hcat(vec(plt_grid_x1), vec(plt_grid_x2))
+    grid_x = vec(plt_grid_x1)
+    grid_y = vec(plt_grid_x2)
     Δx = plt_grid_x1[1, 2] - plt_grid_x1[1, 1]
     Δy = plt_grid_x2[2, 1] - plt_grid_x2[1, 1]
     norm_cst = Δx * Δy / (2π * σ^2)
 
-    function gauss2D(μ::AbstractVector{T}, output::AbstractVector{<:Real}) where {T<:Real}
-        @fastmath @inbounds begin
-            distances = sum(abs2, grid_points .- permutedims(μ), dims=2)
-            @. output = norm_cst * exp(-distances * σ2)
+    function gauss2D(μ1::T, μ2::T, output::AbstractVector{T}) where {T<:Real}
+        @inbounds @simd for i in axes(grid_points, 1)
+            dx = grid_x[i] - μ1
+            dy = grid_y[i] - μ2
+            output[i] = norm_cst * exp(-(dx * dx + dy * dy) * σ2)
         end
         return output
     end
 
-    function gauss2D(μ::AbstractVector{T}) where {T<:Real}
+    function gauss2D(μ1::T, μ2::T) where {T<:Real}
         # Use the same type as the computation result to ensure compatibility with ForwardDiff
         S = typeof(exp(-zero(T) * σ2))
         output = Vector{S}(undef, size(grid_points, 1))
-        return gauss2D(μ, output)
+        return gauss2D(μ1, μ2, output)
     end
 
     function ϕ(x1::AbstractVector{T1}, x2::AbstractVector{T2}) where {T1<:Real,T2<:Real}
         n_points = length(x1)
         T = promote_type(eltype(T1), eltype(T2), Float32)
         result = Matrix{T}(undef, grid_length, n_points)
-        for i in 1:n_points
-            view(result, :, i) .= gauss2D([x1[i], x2[i]])
+        tmp = Vector{T}(undef, grid_length)
+        for i in eachindex(x1)
+            gauss2D(T(x1[i]), T(x2[i]), tmp)
+            @inbounds result[:, i] = tmp
         end
         return result
     end
