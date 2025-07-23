@@ -2,7 +2,7 @@
 
 This repository contains the implementation and experimental results for my Master's dissertation on the super-resolution of point-wise sources. The project focuses on recovering sparse discrete measures from blurred and noisy observations using the Beurling LASSO (BLASSO) framework.
 
-The repository includes all scripts used to generate the figures in the final report and poster presentation, as well as reconstructions on real and simulated microscopy data.
+The repository includes all scripts used to generate the figures in the report and poster.
 
 ## Dataset
 
