@@ -1,7 +1,4 @@
-using ..SparseSpikes
-
 export BLASSO
-
 
 """
 BLASSO struct to hold the problem data and solutions.
@@ -10,27 +7,34 @@ BLASSO struct to hold the problem data and solutions.
 - `y`: Observation vector.
 - `operators`: Operators structure.
 - `domain`: Domain of the problem.
+- `n_grid`: Number of grid points.
 - `λ`: Regularisation parameter.
 - `μ`: Recovered measure.
 - `p`: Dual solution.
-- `dim`: Spatial dimension of the problem.
+- `η`: Dual certificate function.
+- `d`: Spatial dimension of the problem.
+- `reg_path`: Regularisation path data (if stored).
 """
 mutable struct BLASSO
-    y::AbstractVector{<:Number}             # Observation vector/matrix
-    operators::Operators                    # Operators structure
-    domain::Union{Vector,Vector{Vector}}    # Domain of the problem
-    λ::Union{<:Real,Nothing}                # Regularisation parameter
-    μ::Union{DiscreteMeasure,Nothing}       # Recovered measure
-    p::Union{Vector{<:Complex},Nothing}     # Dual solution
-    dim::Int                                # Spatial dimension of the problem
+    y::AbstractVector{<:Number}
+    ops::Operators
+    domain::Union{Vector,Vector{Vector}}
+    n_coarse_grid::Int
+    λ::Union{<:Real,Nothing}
+    μ::Union{DiscreteMeasure,Nothing}
+    p::Union{Vector{<:Complex},Nothing}
+    η::Union{Function,Nothing}
+    d::Int
+    reg_path::Union{Dict{Symbol,Any},Nothing}
 
     function BLASSO(
         y::AbstractVector,
-        operators::Operators,
-        domain::Vector,
+        ops::Operators,
+        domain::AbstractVector,
+        n_coarse_grid::Int;
         λ::Union{<:Real,Nothing}=nothing,
     )
-        dim = isa(domain, Vector{<:Real}) ? 1 : 2
-        new(vec(y), operators, domain, λ, nothing, nothing, dim)
+        d = isa(domain, Vector{<:Real}) ? 1 : 2
+        new(vec(y), ops, domain, n_coarse_grid, λ, nothing, nothing, nothing, d, nothing)
     end
 end

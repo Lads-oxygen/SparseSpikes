@@ -4,17 +4,25 @@ authors = ["Ladislas Walewski"]
 version = "0.1.1"
 
 [deps]
-Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-FFTW = "7a1cc6ca-0e73-5c50-8b35-8df7ec6bd1ea"
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
-Random = "9e28174c-4ba2-5203-b857-d8d62c4213ee"
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
-JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
-MosekTools = "1ec41992-3fe8-5d83-bbdc-93deb6d179d5"
-Polynomials = "f27b6e38-9f58-5fa6-bc11-3df91e5b3a1a"
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MosekTools = "1ec41992-ff65-5c91-ac43-2df89e9693a4"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+
+[compat]
+FFTW = "1.9.0"
+MosekTools = "0.15.10"
+Polynomials = "4.1.0"
+Random = "1.11.0"
+Revise = "3.9.0"
 
 [extras]
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"

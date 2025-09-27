@@ -1,16 +1,20 @@
-using Revise, Plots, LinearAlgebra, LaTeXStrings, Images, Printf
-using Base.Threads, ProgressMeter
+using Revise  # Development tool
+using Images: load, channelview
+using Printf: @sprintf
+using Base.Threads: @threads
+using ProgressMeter: Progress, next!
+
 include("../src/SparseSpikes.jl")
 using .SparseSpikes
 
-# Define domain and regularization parameter
+# Define domain and regularisation parameter
 domain = [[0, 1], [0, 1]]
 
-# Define the plot grid
-num_points = 64
-plt_grid_x1 = [domain[1][1] + i * (domain[1][2] - domain[1][1]) / (num_points - 1) for j in 0:num_points-1, i in 0:num_points-1]
-plt_grid_x2 = [domain[2][1] + j * (domain[2][2] - domain[2][1]) / (num_points - 1) for j in 0:num_points-1, i in 0:num_points-1]
-grid = range(0, stop=1, length=num_points)
+n_coarse_grid = 21
+n_plt_grid = 64
+
+plt_grids = grid(domain, n_plt_grid)
+hm_grid = grid(domain[1, :], n_plt_grid)
 plot_size = (400, 250) .* 2
 
 # Calculate sigma for Gaussian PSF
@@ -24,7 +28,7 @@ end
 σ = sqrt(σ2)
 
 # Create operators
-ops = gaussian_operators_2D(σ, plt_grid_x1, plt_grid_x2)
+ops = gaussian_operators_2D(σ, plt_grids)
 
 """
     readImage!(buffer, imageDir, frameNum)
@@ -46,7 +50,7 @@ end
 # Process a single frame
 function runSFW(image, ops, λ, domain, solver=:BSFW, options=Dict())
     y = vec(image)
-    prob = BLASSO(y, ops, domain, λ)
+    prob = BLASSO(y, ops, domain, n_coarse_grid, λ=λ)
     options = merge(Dict(:maxits => 100, :positivity => true, :progress => false), options)
     @time solve!(prob, solver, options=options)
     return prob.μ
@@ -63,7 +67,7 @@ function writeToCSV(filename, μ, frame)
 
     # Append results
     open(filename, "a") do csvfile
-        if μ.dims == 2
+        if μ.d == 2
             for i in eachindex(μ.a)
                 xPos = @sprintf("%.2f", μ.x[1][i] * 6400)
                 yPos = @sprintf("%.2f", μ.x[2][i] * 6400)
@@ -88,7 +92,7 @@ function get_unique_filename(basepath)
     return filename
 end
 
-λ = 0.0025
+λ = 0.06
 nImages = 32
 
 results = Vector{Any}(undef, nImages)
@@ -109,15 +113,9 @@ p = Progress(nImages; desc="Frame: ")
 @time Threads.@threads for frameNum in 1:nImages
     image = readImage!(img_buffer, input_file, frameNum)
     results[frameNum] = runSFW(image, ops, λ, domain, :BSFW, Dict(:descent => :BFGS))
-    # next!(p)
+    next!(p)
 end
 
-# for frameNum in 1:nImages
-#     writeToCSV(output_file, results[frameNum], frameNum)
-# end
-
-# 5115.790710 seconds sparse sfw
-
-# 4985.769319 seconds high density bsfw (only lasso basically)
-
-# 28474.787277 seconds high density bsfw (50% gc)
+for frameNum in 1:nImages
+    writeToCSV(output_file, results[frameNum], frameNum)
+end

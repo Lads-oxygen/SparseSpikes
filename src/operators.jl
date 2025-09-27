@@ -4,187 +4,220 @@ struct Operators
     ϕ::Function
     Φ::Function
     adjΦ::Function
+    kind::Symbol
 end
 
 """
-    fourier_operators_1D(fc, plt_grid)
-
 Forward operator using Fourier kernel with frequency cutoff `fc` 
 and sampling grid `plt_grid` for the adjoint.
 """
 function fourier_operators_1D(fc::Int, plt_grid::AbstractVector{<:Real})::Operators
-    K = -fc:fc
-    scale = 1 / sqrt(2fc + 1)
+    K = collect(-fc:fc)
+    nK = 2 * fc + 1
+    norm_cst = 1 / sqrt(nK)
 
-    function ϕ(x::AbstractVector{T}) where {T<:Real}
-        return @. exp(-2im * π * K * x') * scale
+    function ϕ(x::AbstractVector{<:Real})
+        return @. cis(-2π * K * x') * norm_cst
     end
 
-    function Φ(x::AbstractVector{<:Real}, a::AbstractVector{<:Real})
-        return ϕ(x) * a
-    end
+    Φ(x::AbstractVector{T}, a::AbstractVector{T}) where {T<:Real} = ϕ(x) * a
 
-    function adjΦ(k::AbstractArray{<:Complex}; grid::AbstractVector{<:Real}=plt_grid)
-        return real(ϕ(grid)' * k)
-    end
+    adjΦ(k::AbstractArray{<:Complex}; grid::AbstractVector{<:Real}=plt_grid) = real(ϕ(grid)' * k)
 
-    return Operators(ϕ, Φ, adjΦ)
+    return Operators(ϕ, Φ, adjΦ, :fourier)
 end
 
 """
-    fourier_operators_2D(fc, plt_grid_x1, plt_grid_x2)
-
 Forward operator using Fourier kernel with frequency cutoff `fc` 
-and sampling grid `plt_grid_x1` and `plt_grid_x2` for the adjoint.
+and sampling grids `plt_grids` for the adjoint.
 """
-function fourier_operators_2D(fc::Int, plt_grid_x1::AbstractMatrix{<:Real}, plt_grid_x2::AbstractMatrix{<:Real})::Operators
+function fourier_operators_2D(fc::Int, plt_grids::Vector{<:AbstractMatrix{<:Real}})::Operators
     k1 = -fc:fc
     k2 = -fc:fc
-    scale = 1 / (2fc + 1)
-    nfreq2 = (2fc + 1)^2
+    nK = 2 * fc + 1
+    nF = nK^2
+    norm_cst = 1 / nK
 
-    function ϕ(x1::AbstractArray{T1}, x2::AbstractArray{T2})::AbstractMatrix{<:Complex} where {T1<:Real,T2<:Real}
-        points = hcat(vec(x1), vec(x2))
-        n_points = size(points, 1)
-        T = promote_type(T1, T2, Float64)
-        result = Matrix{Complex{T}}(undef, nfreq2, n_points)
-
-        @inbounds for i in 1:n_points
+    function ϕ(x1::AbstractVector{T1}, x2::AbstractVector{T2}) where {T1<:Real,T2<:Real}
+        RT = promote_type(T1, T2, typeof(norm_cst))
+        sc = RT(norm_cst)
+        twopi = RT(2π)
+        M = Matrix{Complex{RT}}(undef, nF, length(x1))
+        @inbounds for j in eachindex(x1)
+            xx = RT(x1[j])
+            yy = RT(x2[j])
             idx = 1
-            for k2i in k2, k1i in k1
-                result[idx, i] = exp(-2im * π * T(k1i * points[i, 1] + k2i * points[i, 2])) * scale
+            @inbounds for κ2 in k2, κ1 in k1
+                θ = -twopi * (κ1 * xx + κ2 * yy)
+                M[idx, j] = cis(θ) * sc
                 idx += 1
             end
         end
-        return result
+        return M
+    end
+    ϕ(x::AbstractVector{<:AbstractVector{<:Real}}) = ϕ(x...)
+
+    Φ(x1::AbstractVector{T}, x2::AbstractVector{T}, a::AbstractVector{T}) where {T<:Real} = ϕ(x1, x2) * a
+    Φ(x::AbstractVector{<:AbstractVector{T}}, a::AbstractVector{T}) where {T<:Real} = ϕ(x) * a
+
+    function adjΦ(k::AbstractVector; grid=plt_grids)
+        g1, g2 = grid
+        realkT = real(eltype(k))
+        RT = promote_type(realkT, eltype(g1), eltype(g2), typeof(norm_cst))
+        kC = Complex{RT}.(k)
+        sc = RT(norm_cst)
+        k1v = RT.(k1)
+        k2v = RT.(k2)
+
+        adj_value_at(x, y) = begin
+            xRT = RT(x)
+            yRT = RT(y)
+            acc = zero(Complex{RT})
+            idx = 1
+            @inbounds for κ2 in k2v, κ1 in k1v
+                acc += kC[idx] * cis(2π * (κ1 * xRT + κ2 * yRT))
+                idx += 1
+            end
+            return real(acc * sc)
+        end
+
+        if isa(g1, AbstractMatrix) && isa(g2, AbstractMatrix)
+            @assert size(g1) == size(g2)
+            nx, ny = size(g1)
+            out = Matrix{RT}(undef, nx, ny)
+            @inbounds for j in 1:ny, i in 1:nx
+                out[i, j] = adj_value_at(g1[i, j], g2[i, j])
+            end
+            return permutedims(out)
+        elseif isa(g1, AbstractVector) && isa(g2, AbstractVector)
+            nx, ny = length(g1), length(g2)
+            out = Matrix{RT}(undef, nx, ny)
+            @inbounds for j in 1:ny
+                yv = g2[j]
+                for i in 1:nx
+                    out[i, j] = adj_value_at(g1[i], yv)
+                end
+            end
+            return permutedims(out)
+        else
+            throw(ArgumentError("grid must be [X,Y] matrices or [xvec,yvec] vectors"))
+        end
     end
 
-    function Φ(x1::AbstractArray{T}, x2::AbstractArray{T}, a::AbstractArray{T})::Vector{<:Complex} where {T<:Real}
-        return ϕ(x1, x2) * a
-    end
-
-    function adjΦ(k::AbstractArray{<:Complex}; grid_x1::AbstractArray{<:Real}=plt_grid_x1, grid_x2::AbstractArray{<:Real}=plt_grid_x2)
-        return real(reshape(ϕ(grid_x1, grid_x2)' * k, size(grid_x1)...))
-    end
-
-    return Operators(ϕ, Φ, adjΦ)
+    return Operators(ϕ, Φ, adjΦ, :fourier)
 end
 
 """
-    gaussian_operators_1D(σ, plt_grid)
-
-Forward operator using a discretised Gaussian kernel with standard deviation `σ` on grid `plt_grid`.
+Forward operator using a discretised Gaussian kernel with standard deviation `σ` on grid `coarse_grid`.
 """
-function gaussian_operators_1D(σ::Real, plt_grid::AbstractVector{<:Real})::Operators
-    dσ2 = 1 / σ^2
-    grid_length = length(plt_grid)
+function gaussian_operators_1D(σ::Real, coarse_grid::AbstractVector{<:Real})::Operators
+    N = length(coarse_grid)
+    invσ2 = (1 / σ)^2
 
-    function gauss1D(μ::AbstractVector{T}) where {T<:Real}
-        distances = @. (plt_grid - μ)^2
-        output = @. exp(-distances * dσ2)
-        output ./= maximum(output)
-        return output
+    function _gauss!(μ, buf)
+        @inbounds @simd for i in 1:N
+            dx = coarse_grid[i] - μ
+            buf[i] = exp(-dx * dx * invσ2)
+        end
+        buf
+    end
+
+    function gauss1D(μ::T) where {T<:Real}
+        RT = promote_type(T, eltype(coarse_grid))
+        buf = Vector{RT}(undef, N)
+        _gauss!(RT(μ), buf)
     end
 
     function ϕ(x::AbstractVector{T}) where {T<:Real}
-        n_points = length(x)
-        result = Matrix{T}(undef, grid_length, n_points)
-        for i in 1:n_points
-            view(result, :, i) .= gauss1D([x[i]])
+        s = length(x)
+        RT = promote_type(T, eltype(coarse_grid))
+        K = Matrix{RT}(undef, N, s)
+        @inbounds for j in 1:s
+            K[:, j] = gauss1D(x[j])
         end
-        return result
+        K
     end
 
-    function Φ(x::AbstractVector{<:Real}, a::AbstractVector{<:Real})
-        return ϕ(x) * a
-    end
+    Φ(x::AbstractVector, a::AbstractVector) = ϕ(x) * a
 
-    function adjΦ(k::AbstractArray{<:Real}; grid::AbstractVector{<:Real}=plt_grid)
-        return ϕ(grid)' * k
-    end
+    adjΦ(k::AbstractVector; grid::AbstractVector{<:Real}=coarse_grid) = ϕ(grid)' * k
 
-    return Operators(ϕ, Φ, adjΦ)
+    return Operators(ϕ, Φ, adjΦ, :gaussian)
 end
 
 """
-    gaussian_operators_2D(σ, plt_grid_x1, plt_grid_x2)
-
-Forward operator using a discretised Gaussian kernel with standard deviation `σ` on grid `plt_grid_x1` and `plt_grid_x2`.
+Forward operator using a Gaussian kernel with standard deviation `σ`, sampled on grids `meas_grids`.
 """
-function gaussian_operators_2D(σ::Real, plt_grid_x1::AbstractMatrix{<:Real}, plt_grid_x2::AbstractMatrix{<:Real})::Operators
-    σ2 = 1 / (2 * σ^2)
-    grid_length = length(plt_grid_x1)
-    grid_points = hcat(vec(plt_grid_x1), vec(plt_grid_x2))
-    grid_x = vec(plt_grid_x1)
-    grid_y = vec(plt_grid_x2)
-    Δx = plt_grid_x1[1, 2] - plt_grid_x1[1, 1]
-    Δy = plt_grid_x2[2, 1] - plt_grid_x2[1, 1]
-    norm_cst = Δx * Δy / (2π * σ^2)
+function gaussian_operators_2D(σ::Real, meas_grids::AbstractVector{<:AbstractArray{<:Real}})::Operators
+    G1, G2 = meas_grids
+    g1 = vec(G1)
+    g2 = vec(G2)
+    N = length(g1)
+    inv2σ2 = 1 / (2σ^2)
 
-    function gauss2D(μ1::T, μ2::T, output::AbstractVector{T}) where {T<:Real}
-        @inbounds @simd for i in axes(grid_points, 1)
-            dx = grid_x[i] - μ1
-            dy = grid_y[i] - μ2
-            output[i] = norm_cst * exp(-(dx * dx + dy * dy) * σ2)
+    function gauss2D(μ1::T1, μ2::T2) where {T1<:Real,T2<:Real}
+        RT = promote_type(T1, T2, eltype(g1))
+        v = Vector{RT}(undef, N)
+        @inbounds @simd for i in 1:N
+            d1 = g1[i] - μ1
+            d2 = g2[i] - μ2
+            v[i] = exp(-(d1 * d1 + d2 * d2) * RT(inv2σ2))
         end
-        return output
-    end
-
-    function gauss2D(μ1::T, μ2::T) where {T<:Real}
-        # Use the same type as the computation result to ensure compatibility with ForwardDiff
-        S = typeof(exp(-zero(T) * σ2))
-        output = Vector{S}(undef, size(grid_points, 1))
-        return gauss2D(μ1, μ2, output)
+        v
     end
 
     function ϕ(x1::AbstractVector{T1}, x2::AbstractVector{T2}) where {T1<:Real,T2<:Real}
-        n_points = length(x1)
-        T = promote_type(eltype(T1), eltype(T2), Float32)
-        result = Matrix{T}(undef, grid_length, n_points)
-        tmp = Vector{T}(undef, grid_length)
-        for i in eachindex(x1)
-            gauss2D(T(x1[i]), T(x2[i]), tmp)
-            @inbounds result[:, i] = tmp
+        @assert length(x1) == length(x2)
+        s = length(x1)
+        RT = promote_type(T1, T2)
+        M = Matrix{RT}(undef, N, s)
+        @inbounds for j in 1:s
+            M[:, j] = gauss2D(x1[j], x2[j])
         end
-        return result
+        M
+    end
+    ϕ(x::AbstractVector{<:AbstractVector{<:Real}}) = ϕ(x...)
+    function ϕ(x::AbstractVector)
+        @assert length(x) == 2
+        return ϕ([x[1]], [x[2]])
     end
 
-    # Modified Φ that avoids allocating the full matrix
-    function Φ(x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, a::AbstractVecOrMat{<:Real})
-        n_points = length(x1)
+    Φ(x1::AbstractVector{T}, x2::AbstractVector{T}, a::AbstractVector{T}) where {T<:Real} = ϕ(x1, x2) * a
+    Φ(x::AbstractVector{<:AbstractVector{T}}, a::AbstractVector{T}) where {T<:Real} = ϕ(x) * a
 
-        # Use a more flexible type that can handle dual numbers
-        T = promote_type(eltype(x1), eltype(x2), eltype(a), Float32)
-        result = zeros(T, grid_length)
+    @inline gridvecs(h1::AbstractMatrix, h2::AbstractMatrix) = (vec(h1), vec(h2))
+    @inline gridvecs(h1::AbstractVector, h2::AbstractVector) = (
+        repeat(h1, inner=length(h2)), repeat(h2, outer=length(h1))
+    )
+    @inline aspair(g) = isa(g, Tuple) ? g : (g[1], g[2])
+    @inline gridshape(g) = isa(first(aspair(g)), AbstractMatrix) ? size(first(aspair(g))) :
+                           (length(aspair(g)[1]), length(aspair(g)[2]))
 
-        if n_points < 100
-            return ϕ(x1, x2) * a
-        end
-
-        # Multithreaded implementation for large point sets to avoid creating large matrix when calling kernel ϕ
-        buffers = [similar(result) for _ in 1:Threads.nthreads()]
-        results = [zeros(T, grid_length) for _ in 1:Threads.nthreads()]
-
-        Threads.@threads for i in 1:n_points
-            tid = Threads.threadid()
-            local_μ = zeros(T, 2)
-            local_μ[1] = x1[i]
-            local_μ[2] = x2[i]
-            gauss2D(local_μ, buffers[tid])
-            axpy!(a[i], buffers[tid], results[tid])
-        end
-
-        # Combine results from all threads
-        for tid in 1:Threads.nthreads()
-            axpy!(1.0, results[tid], result)
-        end
-
-        return result
+    @inline function kernel_matrix(dst)
+        Xt, Yt = gridvecs(aspair(dst)...)
+        ϕ(Xt, Yt)
     end
 
-    function adjΦ(k::AbstractArray{<:Real}; grid_x1::AbstractArray{<:Real}=plt_grid_x1, grid_x2::AbstractArray{<:Real}=plt_grid_x2)
-        return real(reshape(ϕ(vec(grid_x1), vec(grid_x2))' * k, size(grid_x1)...))
+    function adjΦ(k::AbstractVector; grid=meas_grids)
+        Xm, Ym = gridvecs(aspair(meas_grids)...)
+        @assert length(k) == length(Xm)
+
+        cert = kernel_matrix(grid)' * k
+        permutedims(reshape(cert, gridshape(grid)))
     end
 
-    return Operators(ϕ, Φ, adjΦ)
+    return Operators(ϕ, Φ, adjΦ, :gaussian)
+end
+
+
+function Base.iterate(ops::Operators, state::Int=1)
+    if state == 1
+        return (ops.ϕ, 2)
+    elseif state == 2
+        return (ops.Φ, 3)
+    elseif state == 3
+        return (ops.adjΦ, 4)
+    else
+        return nothing
+    end
 end

@@ -1,25 +1,19 @@
 module SparseSpikes
 
-using Plots
-using FFTW
-using LinearAlgebra
-using LaTeXStrings
-using Random
-using Distributions
-using JuMP
-using MosekTools
-using Polynomials
-using DSP
-using Optim
-using SemialgebraicSets
-
+# Dev
 using Revise
+
 includet("operators.jl")
 includet("utils.jl")
 includet("blasso.jl")
-includet("SDP.jl")
-includet("SFW.jl")
-includet("MDP.jl")
+includet("regularisation_paths.jl")
+includet("plots.jl")
+includet("semidefinite_programming.jl")
+includet("sliding_frank_wolfe.jl")
+includet("morozov_discrepancy_principle.jl")
+includet("fast_homotopy.jl")
+includet("node.jl")
+includet("hybrid.jl")
 includet("solve.jl")
 
 export solve!

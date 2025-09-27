@@ -1,16 +1,17 @@
-using Revise, Plots, LinearAlgebra, Images
+using Revise
+using Plots, Plots.Measures
+
 include("../src/SparseSpikes.jl")
 using .SparseSpikes
 
-# Define domain and regularization parameter
+# Define domain and regularisation parameter
 FOV = 6400
 domain = [[0, 1], [0, 1]]
 
 # Define the plot grid
-num_points = 600
-plt_grid_x1 = [domain[1][1] + i * (domain[1][2] - domain[1][1]) / (num_points - 1) for j in 0:num_points-1, i in 0:num_points-1]
-plt_grid_x2 = [domain[2][1] + j * (domain[2][2] - domain[2][1]) / (num_points - 1) for j in 0:num_points-1, i in 0:num_points-1]
-grid = range(0, stop=1, length=num_points)
+n_plt_grid = 64
+plt_grids = grid(domain, n_plt_grid)
+hm_grid = grid(domain[1, :], n_plt_grid)
 plot_size = (400, 400) .* 2
 
 # Calculate sigma for Gaussian PSF
@@ -64,16 +65,14 @@ end
 sources = readSourcesCSV("SMLM/results/high_density_results.csv")              # High density recovered data
 
 
-ops = gaussian_operators_2D(σ, plt_grid_x1, plt_grid_x2)
+ops = gaussian_operators_2D(σ, plt_grids)
 
 # Apply the PSF operator to the discrete measure
 μ = mergeDiscreteMeasures(sources)
 
-reconstructed_image = reshape(ops.Φ(μ.x..., μ.a), num_points, num_points)
+reconstructed_image = reshape(ops.Φ(μ...), n_plt_grid, n_plt_grid)
 
-using Plots.Measures
-# Display the result
-heatmap(grid, grid, reconstructed_image, c=:viridis, ratio=:equal, size=plot_size, ticks=false, xlabel="", ylabel="", colorbar=false, margins=-2mm)
+heatmap(hm_grid, hm_grid, reconstructed_image, c=:viridis, ratio=:equal, size=plot_size, ticks=false, xlabel="", ylabel="", colorbar=false, margins=-2mm)
 
 # savefig("figures/SMLM/SMLM_sources.svg")
 # savefig("figures/SMLM/SMLM_inverse_low.svg")
