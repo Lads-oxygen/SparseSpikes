@@ -50,8 +50,8 @@ function MDP!(b::BLASSO,
     end
 
     # Choose smallest λ such that Φ(μ) = 0, as starting point
-    ϕ, Φ = b.ops.ϕ, b.ops.Φ
-    b.λ = λ₀(grid(b.domain, b.n_coarse_grid), ϕ, b.y, η_tol)
+    # b.λ = λ₀(build_grid(b.domain, b.n_coarse_grid), b.ops.ϕ, b.y, η_tol)
+    b.λ = 3
 
     r = norm(b.y)
 
@@ -64,7 +64,7 @@ function MDP!(b::BLASSO,
 
         !warm_start && (b.μ = nothing)
         solve!(b, base_solver, options=options)
-        r = norm(Φ(b.μ...) - b.y)
+        r = norm(b.ops.Φₓ(b.μ...) - b.y)
 
         if store_reg_path && !isnothing(b.μ)
             push!(b.reg_path[:λs], b.λ)

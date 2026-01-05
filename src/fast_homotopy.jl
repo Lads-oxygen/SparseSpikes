@@ -48,7 +48,7 @@ function FH!(b::BLASSO,
         )
     end
 
-    xgrid = grid(b.domain, b.n_coarse_grid)
+    xgrid = build_grid(b.domain, b.n_coarse_grid)
 
     # Choose smallest λ such that Φ(μ) = 0, as starting point
     ϕ, Φ, adjΦ = b.ops

@@ -1,5 +1,6 @@
 using JuMP, MosekTools, Polynomials
 using DSP: conv
+using LinearAlgebra: tr, pinv, diag, Hermitian
 
 export SDP!, solve_dual, solve_primal
 
@@ -32,18 +33,19 @@ function solve_dual!(b, verbose)
     !verbose && set_silent(model)
 
     @variable(model, p[1:n] in ComplexPlane())
-    @variable(model, X[1:n+1, 1:n+1] in HermitianPSDCone())
-    @constraint(model, tr(X) == 2)
-    @constraint(model, X[n+1, n+1] == 1)
-    @constraint(model, X[1:n, n+1] .== p)
-    @constraint(model, [j = 1:(n-1)], sum(diag(X, j)) == X[n+1-j, n+1])
-    if λ == 0
-        @objective(model, Max, real(p' * y))
+    @variable(model, Q[1:n, 1:n] in HermitianMatrixSpace())
+    @constraint(model, Hermitian([Q p; p' 1]) in HermitianPSDCone())
+    @constraint(model, sum(diag(Q, 0)) == 1)
+    @constraint(model, [k = 1:n-1], sum(diag(Q, k)) == 0)
+
+    # Objective (λ>0): min || y/λ - p ||_2^2 ; (λ=0): max Re⟨p,y⟩
+    if b.λ == 0
+        @objective(model, Max, real(p' * b.y))
     else
-        @objective(model, Min, sum(abs2.(y / b.λ .- p)))
+        @objective(model, Min, sum(abs2.(b.y / b.λ .- p)))
     end
     optimize!(model)
-    b.p = value.(p)
+    b.p = value.(p) * sqrt(n) # unnormalise
 end
 
 """
@@ -54,16 +56,15 @@ Solve the primal problem given the solution to the dual problem pλ.
 """
 function solve_primal!(b)
     n = length(b.y)
-    c = -conv(b.p, reverse(conj(b.p)))
+    p′ = b.p / sqrt(n) # normalise
+    c = -conv(p′, reverse(conj(p′)))
     c[n] += 1
-    P = Polynomial(c)
-    r = roots(P)
-    r0 = r[abs.(1 .- abs.(r)).<1e-10]
-    r0 = sort(r0, by=angle)[1:2:end]
-    x = angle.(r0) / (2π)
-    x = sort(mod.(x, 1))
-    ϕx = b.ops.ϕ(x)
-    s = sign.(real.(ϕx' * b.p))
-    a = real(pinv(ϕx) * b.y - b.λ * pinv(ϕx' * ϕx) * s)
+    r = roots(Polynomial(c))
+    rU = r[abs.(1 .- abs.(r)).<1e-6] # unit roots
+    θ = sort(-angle.(rU))[1:2:end]
+    x = sort(mod.(θ / (2π), 1))
+    Φₓ = hcat((b.ops.ϕ(xⱼ) for xⱼ in x)...)
+    s = sign.(Φₓ' * b.p)
+    a = real(Φₓ \ b.y - b.λ * pinv(Φₓ' * Φₓ) * s)
     b.μ = DiscreteMeasure(x, a)
 end

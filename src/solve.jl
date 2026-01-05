@@ -35,7 +35,7 @@ function solve!(b::BLASSO, solver::Symbol=:SFW;
             :MDP => () -> MDP!(b, options),
             :FH => () -> FH!(b, options),
             :NODE => () -> NODE!(b, options)
-            :Hybrid => () -> Hybrid!(b, options),
+            # :Hybrid => () -> Hybrid!(b, options),
         )
 
         if haskey(solver_map, solver)

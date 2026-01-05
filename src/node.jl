@@ -1,5 +1,9 @@
-using Optim, LineSearches, ForwardDiff
+using Optim, LineSearches
 using LinearAlgebra: norm, dot
+using Mooncake
+using DifferentiationInterface
+using ForwardDiff: jacobian
+using LinearAlgebra: cond
 
 export NODE!
 
@@ -17,84 +21,84 @@ function MBuffer(s::Integer, d::Integer; T::Type=Float64)
 end
 
 # RHS that reuses your MBuffer and v0
-@views function rhs(z, _MB, v0, ϕ, y, d, s)
+@views function rhs(z, _MB, v0, ops, y, d, s)
     a = z[1:s]
     x = reshape(z[s+1:end], d, s)  # (d × s)
-    fill_M!(_MB, a, x, ϕ, y)        # fills MB.M in-place
+    fill_M!(_MB, a, x, ops, y)        # fills MB.M in-place
     return (_MB.M \ v0)             # dz
 end
 
 # Forward Euler
-function forward_euler_step!(z, h, _MB, v0, ϕ, y, d, s)
-    k1 = rhs(z, _MB, v0, ϕ, y, d, s)
+function forward_euler_step!(z, h, _MB, v0, ops, y, d, s)
+    k1 = rhs(z, _MB, v0, ops, y, d, s)
     z .-= h .* k1
     return z
 end
 
 # Heun's method (RK2)
-function heun_step!(z, h, _MB, v0, ϕ, y, d, s)
-    k1 = rhs(z, _MB, v0, ϕ, y, d, s)
-    k2 = rhs(z .- h .* k1, _MB, v0, ϕ, y, d, s)
+function heun_step!(z, h, _MB, v0, ops, y, d, s)
+    k1 = rhs(z, _MB, v0, ops, y, d, s)
+    k2 = rhs(z .- h .* k1, _MB, v0, ops, y, d, s)
     z .-= (h / 2) .* (k1 .+ k2)
     return z
 end
 
 # RK4
-function rk4_step!(z, h, _MB, v0, ϕ, y, d, s)
-    k1 = rhs(z, _MB, v0, ϕ, y, d, s)
-    k2 = rhs(z .- 0.5h .* k1, _MB, v0, ϕ, y, d, s)
-    k3 = rhs(z .- 0.5h .* k2, _MB, v0, ϕ, y, d, s)
-    k4 = rhs(z .- h .* k3, _MB, v0, ϕ, y, d, s)
-    z .-= (h / 6) .* (k1 .+ 2k2 .+ 2k3 .+ k4)
+function rk4_step!(z, h, _MB, v0, ops, y, d, s)
+    k1 = rhs(z, _MB, v0, ops, y, d, s)
+    k2 = rhs(z .- 0.5 * h .* k1, _MB, v0, ops, y, d, s)
+    k3 = rhs(z .- 0.5 * h .* k2, _MB, v0, ops, y, d, s)
+    k4 = rhs(z .- h .* k3, _MB, v0, ops, y, d, s)
+    z .-= (h / 6) .* (k1 .+ 2 * k2 .+ 2 * k3 .+ k4)
     return z
 end
 
-function implicit_euler_step!(z, h, _MB, v0, ϕ, y, d, s; tol=1e-8, maxiter=100)
+function implicit_euler_step!(z, h, _MB, v0, ops, y, d, s; tol=1e-8, maxiter=100)
     z0 = copy(z)
 
-    # Prediction (explicit Euler) as initial guess
-    k1 = rhs(z, _MB, v0, ϕ, y, d, s)
+    # # Prediction (explicit Euler) as initial guess
+    k1 = rhs(z, _MB, v0, ops, y, d, s)
     w = z0 .- h .* k1
 
     # Closure to build rhs with proper element type (for Dual numbers)
     function rhs_typed(wvec)
         T = eltype(wvec)
-        MBt = MBuffer(s, d; T=T)                # fresh buffer with correct eltype
+        MBt = MBuffer(s, d; T=T)                 # fresh buffer with correct eltype
         a = wvec[1:s]
         x = reshape(wvec[s+1:end], d, s)
-        fill_M!(MBt, a, x, ϕ, y)
+        fill_M!(MBt, a, x, ops, y)
         vt = convert.(T, v0)                     # promote v
+        # display(MBt.M)
+        # println("cond(M) ≈ ", cond(ForwardDiff.value.(MBt.M)))
         return (MBt.M \ vt)
     end
 
     G(wvec) = wvec .- z0 .+ h .* rhs_typed(wvec)
+    # G(w) = w .- z0 .+ h .* rhs_typed(w)
+    # w = copy(z)
 
     converged = false
     for _ in 1:maxiter
         Gw = G(w)
-        if norm(MBt.M * (w - z) + h .* v0, Inf) < tol
-            converged = true
-            break
+        if norm(Gw, Inf) < tol * (1 + norm(z0, Inf))
+            z .= w
+            return z
+            # converged = true
+            # break
         end
-        J = ForwardDiff.jacobian(G, w)
+        J = jacobian(G, w)
         δ = J \ (-Gw)
         w .+= δ
         if norm(δ) < tol * (1 + norm(w))
-            converged = true
-            break
+            z .= w
+            return z
+            # converged = true
+            # break
         end
     end
-
-    !converged && display(("Didnt converge", norm(ForwardDiff.jacobian(G, w) \ (-G(w))), norm(z0 .- h .* k1)))
-
-    begin
-        a = w[1:s]
-        x = reshape(w[s+1:end], d, s)
-        T = eltype(w)
-        MBt = MBuffer(s, d; T=T)
-        fill_M!(MBt, a, x, ϕ, y)
-    end
-
+    # if !converged
+    #     @warn "Implicit Euler step did not converge within $maxiter iterations."
+    # end
     z .= w
     return z
 end
@@ -132,9 +136,9 @@ with
   M_ax[k,(j)] =  j==k ? ∑_ℓ a_ℓ ∇K(xk - xℓ)^T - ∇f(xk)^T :  -a_j ∇K(xk - xj)^T
   M_xa[(k),j] =  ∇K(xk - xj)
   M_xx[(k),(j)] =  j==k ? ∑_ℓ a_ℓ ∇²K(xk - xℓ) - ∇²f(xk) :  -a_j ∇²K(xk - xj)
-where f(x)=⟨φ(x),y⟩.
+where g(x)=⟨φ(x),y⟩.
 """
-function fill_M!(MB, a, x, ϕ, y)
+function fill_M!(MB, a, x, ops, y)
     s, d = MB.s, MB.d
     fill!(MB.M, 0)
 
@@ -150,60 +154,50 @@ function fill_M!(MB, a, x, ϕ, y)
     M_xa = @view MB.M[s+1:end, 1:s]
     M_xx = @view MB.M[s+1:end, s+1:end]
 
-    xref = fill(0.5, d) #TODO use middle of domain
-
-    # Kernel and its derivatives: Δ is always a length-d vector
-    K(Δ::AbstractVector) = dot(ϕ(xref .+ Δ / 2), ϕ(xref .- Δ / 2))
-    ∇K(Δ::AbstractVector) = ForwardDiff.gradient(K, Δ)
-    ΔK(Δ::AbstractVector) = ForwardDiff.hessian(K, Δ)
-
-    # Data term f and derivatives
-    f(z::AbstractVector) = dot(ϕ(z), y)
-    ∇f(z::AbstractVector) = ForwardDiff.gradient(f, z)
-    Δf(z::AbstractVector) = ForwardDiff.hessian(f, z)
+    cϕ, ∇cϕ, Δcϕ = ops.cϕ, ops.∇cϕ, ops.Δcϕ
+    g(z::Real) = dot(ops.ϕ(z), y)
+    ∇g(z::Real) = dot(ops.∇ϕ(z), y)
+    Δg(z::Real) = dot(ops.Δϕ(z), y)
 
     @inbounds for k in 1:s
         xk = @view x[:, k]
 
-        # g_k = Σ_l a_l ∇K(xk - xl) - ∇f(xk)
+        # g_k = Σ_l a_l ∇K(xk - xl) - ∇g(xk)
         ∇K_jk = zeros(eltype(a), d)
         for l in 1:s
-            Δkl = xk .- @view(x[:, l])          # d-vector
-            ∇K_jk .+= a[l] .* ∇K(Δkl)
+            Δkl = xk .- @view(x[:, l])
+            ∇K_jk .+= a[l] .* ∇cϕ(Δkl[1])
         end
-        ∇K_jk .-= ∇f(xk)
+        ∇K_jk .-= ∇g(xk[1])
 
         for j in 1:s
             Δkj = xk .- @view(x[:, j])
-            M_aa[k, j] = K(Δkj)
+            M_aa[k, j] = cϕ(Δkj[1])
 
             max_blk = @view M_ax[k, (j-1)*d+1:j*d]
             if j == k
                 @. max_blk = ∇K_jk
             else
-                max_blk .= -a[j] .* ∇K(Δkj)
+                max_blk .= -a[j] .* ∇cϕ(Δkj[1])
             end
 
             mxa_col = @view M_xa[(k-1)*d+1:k*d, j]
-            mxa_col .= ∇K(Δkj)
-
+            mxa_col .= ∇cϕ(Δkj[1])
             mxx_blk = @view M_xx[(k-1)*d+1:k*d, (j-1)*d+1:j*d]
             if j == k
                 fill!(mxx_blk, 0)
                 for l in 1:s
                     Δkl = xk .- @view(x[:, l])
-                    mxx_blk .+= a[l] .* ΔK(Δkl)
+                    mxx_blk .+= a[l] .* Δcϕ(Δkl[1])
                 end
-                mxx_blk .-= Δf(xk)
+                mxx_blk .-= Δg(xk[1])
             else
-                mxx_blk .= -a[j] .* ΔK(Δkj)
+                mxx_blk .= -a[j] .* Δcϕ(Δkj[1])
             end
         end
     end
     return nothing
 end
-
-
 
 """
 Solve the BLASSO problem using by solving an ODE numerically to approximate the regularisation path.
@@ -252,16 +246,14 @@ function NODE!(b::BLASSO,
         :μs => DiscreteMeasure[],
     )
 
-    xgrid = grid(b.domain, b.n_coarse_grid)
+    xgrid = build_grid(b.domain, b.n_coarse_grid)
 
-    ϕ, Φ, adjΦ = b.ops    
-
-    y = b.y
-    b.λ = min(λ₀_opt, λ₀(xgrid, ϕ, y, η_tol) - eps(Float64))
+    y, ops = b.y, b.ops
+    b.λ = min(λ₀_opt, λ₀(xgrid, ops.ϕ, y, η_tol) - eps(Float64))
     solve!(b, base_solver; options=options)
     μ_pred = deepcopy(b.μ)
     η = b.η
-    r = norm(y - Φ(b.μ...))
+    r = norm(y - ops.Φₓ(b.μ...))
     z = vcat(b.μ.a, vcat(b.μ.x...))
     v0 = vcat(-sign.(b.μ.a), zeros(b.μ.s * b.d))
     MB = MBuffer(b.μ.s, b.d)
@@ -270,7 +262,11 @@ function NODE!(b::BLASSO,
 
     prog = ProgressUnknown(desc="NODE iterations: ")
 
+    corrections = 0
+    total = 0
+
     for _ in 1:maxits
+        # println("$total")
         progress && next!(prog)
 
         verbose && println("λ = $(b.λ), |I| = $(sparsity(b.μ))")
@@ -284,19 +280,20 @@ function NODE!(b::BLASSO,
         end
         b.λ -= h
 
-        forward_euler_step!(z, h, MB, v0, ϕ, y, b.d, b.μ.s)
-        # heun_step!(z, h, MB, v0, ϕ, y, b.d, b.μ.s)
-        # rk4_step!(z, h, MB, v0, ϕ, y, b.d, b.μ.s)
-        # implicit_euler_step!(z, h, MB, v0, ϕ, y, b.d, b.μ.s)
+        forward_euler_step!(z, h, MB, v0, ops, y, b.d, b.μ.s)
+        # heun_step!(z, h, MB, v0, ops, y, b.d, b.μ.s)
+        # rk4_step!(z, h, MB, v0, ops, y, b.d, b.μ.s)
+        # implicit_euler_step!(z, h, MB, v0, ops, y, b.d, b.μ.s)
         update_μ!(μ_pred, z, b.d, b.μ.s)
-        a_sign_changed = any(μ_pred.a ./ b.μ.a .<= 0)
+        a_sign_changed = any(μ_pred.a .* b.μ.a .<= 0)
         
-        η = build_η(μ_pred..., adjΦ, Φ, y, b.λ)
+        η = ops.ηλ(μ_pred..., y, b.λ)
         η_max = compute_η_max(η, xgrid)[2]
 
         if η_max < 1 + η_tol && !a_sign_changed
             copy!(b.μ.x, μ_pred.x)
             copy!(b.μ.a, μ_pred.a)
+            h = min(h * 2, 1e-3)
         else
             solve!(b, base_solver; options=options)
             z = vcat(b.μ.a, vcat(b.μ.x...))
@@ -306,9 +303,11 @@ function NODE!(b::BLASSO,
                 μ_pred = deepcopy(b.μ)
                 prev_s = b.μ.s
             end
+            corrections += 1
+            h = max(h / 2, 1e-10)
         end
 
-        r = norm(y - Φ(b.μ...))
+        r = norm(y - ops.Φₓ(b.μ...))
 
         push!(b.reg_path[:λs], b.λ)
         push!(b.reg_path[:μs], deepcopy(b.μ))
@@ -319,7 +318,11 @@ function NODE!(b::BLASSO,
         if r < τδ
             break
         end
+
+        total += 1
     end
+
+    display("NODE! completed with $(corrections) corrections over $(total) iterations.")
 
     if !store_reg_path
         b.reg_path = nothing

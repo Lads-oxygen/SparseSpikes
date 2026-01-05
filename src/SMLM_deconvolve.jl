@@ -10,8 +10,8 @@ domain = [[0, 1], [0, 1]]
 
 # Define the plot grid
 n_plt_grid = 64
-plt_grids = grid(domain, n_plt_grid)
-hm_grid = grid(domain[1, :], n_plt_grid)
+plt_grids = build_grid(domain, n_plt_grid)
+hm_grid = build_grid(domain[1, :], n_plt_grid)
 plot_size = (400, 400) .* 2
 
 # Calculate sigma for Gaussian PSF

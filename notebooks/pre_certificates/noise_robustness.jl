@@ -16,9 +16,9 @@ domain = [[0, 1], [0, 1]]
 n_coarse_grid = 21
 n_plt_grid = 101
 
-coarse_grids = grid(domain, n_coarse_grid)
-plt_grids = grid(domain, n_plt_grid)
-hm_grid = grid(domain[1, :], n_plt_grid)
+coarse_grids = build_grid(domain, n_coarse_grid)
+plt_grids = build_grid(domain, n_plt_grid)
+hm_grid = build_grid(domain[1, :], n_plt_grid)
 
 plot_size = (100, 100) .* 5
 plt = heatmap(xlims=domain[1], ylims=domain[2],

@@ -1,4 +1,4 @@
-using Optim, LineSearches, ForwardDiff, Printf
+using Optim, LineSearches, Printf
 using LinearAlgebra: norm, dot
 
 export Hybrid!
@@ -51,8 +51,8 @@ function next_kink!(b, ϕ, xgrid, η_tol)
     end
 
     λₑₛ(xᵢ) = λₑ([xᵢ])
-    λₑ′(xᵢ) = ForwardDiff.gradient(λₑ, xᵢ)[1]
-    λₑ′′(xᵢ) = ForwardDiff.hessian(λₑ, xᵢ)[1, 1]
+    λₑ′(xᵢ) = nothing#ForwardDiff.gradient(λₑ, xᵢ)[1] #TODO
+    λₑ′′(xᵢ) = nothing#ForwardDiff.hessian(λₑ, xᵢ)[1, 1]
 
     Δ = step(xgrid)
     domain = extrema(xgrid)
@@ -133,7 +133,7 @@ function Hybrid!(b::BLASSO,
         :μs => DiscreteMeasure[],
     )
 
-    xgrid = grid(b.domain, b.n_coarse_grid)
+    xgrid = build_grid(b.domain, b.n_coarse_grid)
 
     ϕ, Φ = b.ops.ϕ, b.ops.Φ
 

@@ -1,14 +1,7 @@
 - 2d \lambda0 could be written more legibly
 
+1. use notation Φₓ everywhere
+2. Use μ₀ everywhere instead of μ0, use ηᵥ
+3. use more consistent naming tmp, buf, out etc in operators
 
-
-
-
-
-- use plot spikes everywhere (search for scatter)
-- use grid function everywhere and ensure that we use coarse grids for operators
-- use ops.Φ(μ0...) everyhwere (search for Φ(x0 )
-
-
-- use compute_η_max
-
+change all grids to be even no. of points
